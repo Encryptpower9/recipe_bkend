@@ -143,9 +143,9 @@ app.post('/api/recipes/search', async (req, res) => {
 
         // Construct the prompt to instruct the LLM on exact formatting
         const ragPrompt = `You are a helpful recipe assistant. Your task is to list the provided recipes in a very specific format.
-        Answer the user's question accurately based *only* on the provided recipe information. If the answer is not contained within the provided context, state that you don't have enough information about recipes.
+        Answer the user's question accurately based *only* on the provided recipe information. If the answer is not contained within the provided context, state that you don't have enough information about recipes; and do not attach any recipes in that case.
 
-        User's original query: "${userQuery}" + recipes must be ${dietaryRestrictions}; ${cuisinePreferences}; ${mealType}.
+        User's original query: "${userQuery}"
         
 
         Retrieved Recipe Information (Context):
@@ -159,10 +159,17 @@ app.post('/api/recipes/search', async (req, res) => {
 
         Where X is the recipe number (starting from 1), Y.YYYY is the score to four decimal places, and Recipe Title is the exact title.
 
+        Additionally, remember:
+
+        Ensure the selections adhere to criteria: “${dietaryRestrictions}; ${cuisinePreferences} cuisine; ${mealType}”.
+        If the query does not match any recipes, respond with "I don't have enough information about recipes." and do not include any recipes in the response.
+
         Do NOT include any other text, Just provide the formatted list.`;
 
         const chatResult = await chat.sendMessage(ragPrompt);
         const llmResponseText = chatResult.response.text();
+
+        
 
         // 4. Attach/bind image URLs to retrievedRecipes
         const imageCollection = db2.collection("recipe_images_full");
@@ -216,7 +223,7 @@ app.post('/api/recipes/search', async (req, res) => {
 
 
         // Enrich the original retrievedRecipes array with image URLs.
-        const recipesWithImages = retrievedRecipes.map(recipe => {
+        let recipesWithImages = retrievedRecipes.map(recipe => {
             let imageUrl = null;
 
             // Only attempt to get imageUrl if recipe._id is present (and it's guaranteed to be a string or null)
@@ -241,6 +248,10 @@ app.post('/api/recipes/search', async (req, res) => {
             console.log(`Recipe ID: '${rec._id}', Title: '${rec.title}', ImageURL: ${rec.imageUrl ? rec.imageUrl.substring(0, 70) + '...' : 'null'}`);
         });
         console.log('----------------------------------------------------');*/
+
+        if (llmResponseText.includes("I don't have enough information about recipes")) {
+        recipesWithImages = [];
+        }
 
 
         // 5. Send response to frontend
